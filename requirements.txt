@@ -1,0 +1,6 @@
+pyrogram
+pyromod
+aiohttp
+aiofiles
+psutil
+requests
