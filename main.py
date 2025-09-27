@@ -21,7 +21,7 @@ from pyrogram.errors import (
 # بيانات API
 API_ID = 23656977
 API_HASH = "49d3f43531a92b3f5bc403766313ca1e"
-BOT_TOKEN = "8398354970:AAGcDT0WAIUvT2DnTqyxfY1Q8h2b5rn-LIo"
+BOT_TOKEN = "8398354970:AAHqgmpKPptjDgI_Ogs1fKnBgfPi4N8SoR4"
 
 # إعدادات المدير
 ADMIN_ID = 6689435577
