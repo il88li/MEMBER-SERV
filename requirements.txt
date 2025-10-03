@@ -1,3 +1,0 @@
-pyTelegramBotAPI==4.15.2
-Telethon==1.28.5
-schedule==1.2.0
