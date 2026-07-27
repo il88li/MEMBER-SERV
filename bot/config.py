@@ -1,3 +1,5 @@
+# bot/config.py
+
 BOT_TOKEN = "8998562807:AAG4GIpWf7qWLPuTpD0f-nGXYZEDOgZXIto"
 BOT_USERNAME = "UFOQ_BOT"
 CHANNEL_ID = "@UFOQ_7"
@@ -13,7 +15,17 @@ MAX_IMAGE_SIZE = 5242880
 SUPABASE_URL = "https://sthyookhxbaxqmuvqhps.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN0aHlvb2toeGJheHFtdXZxaHBzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NDgyNzM2NywiZXhwIjoyMTAwNDAzMzY3fQ.GVHcULh7HA0sCGadk18oK5qzQmrllxm7QVQ5TgPBnQc"
 
-# ... باقي النصوص الثابتة كما هي ...
+PROXY_ENABLED = False
+PROXY_TYPE = "socks5"
+PROXY_HOST = ""
+PROXY_PORT = 1080
+PROXY_USER = ""
+PROXY_PASS = ""
+
+# ============================================================
+# النصوص الثابتة
+# ============================================================
+
 WELCOME_TEXT = """
 <b>🌟 مرحباً بك في بوت UFOQ</b>
 
