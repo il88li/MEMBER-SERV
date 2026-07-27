@@ -1,17 +1,18 @@
+# api/webhook.py
 import sys
 import os
 import json
 import logging
 import asyncio
+import requests
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from telegram import Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
-# استيراد الملفات من مجلد bot
 from bot import config
 from bot import database as db
-import bot.grok_api as grok_api      # <-- التعديل الأساسي
+import bot.grok_api
 from bot import keyboards
 from bot import admin
 from bot.main import (
@@ -21,6 +22,28 @@ from bot.main import (
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# ============================================================
+# تعيين Webhook تلقائياً
+# ============================================================
+
+def set_webhook():
+    webhook_url = "https://member-serv.vercel.app/api/webhook"
+    api_url = f"https://api.telegram.org/bot{config.BOT_TOKEN}/setWebhook"
+    try:
+        resp = requests.post(api_url, json={"url": webhook_url}, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("ok"):
+                logger.info(f"✅ Webhook set successfully to {webhook_url}")
+            else:
+                logger.error(f"❌ Failed to set webhook: {data.get('description')}")
+        else:
+            logger.error(f"❌ HTTP {resp.status_code} from Telegram API")
+    except Exception as e:
+        logger.error(f"❌ Error setting webhook: {e}")
+
+set_webhook()
 
 # ============================================================
 # تهيئة التطبيق
@@ -45,7 +68,6 @@ app.add_handler(MessageHandler(filters.PHOTO & ~filters.COMMAND, handle_image))
 app.add_handler(CallbackQueryHandler(other_callbacks, pattern="^(?!extract$|cancel_extract$|admin_).*$"))
 app.add_error_handler(error_handler)
 
-# تهيئة قاعدة البيانات
 db.init_db()
 
 # ============================================================
