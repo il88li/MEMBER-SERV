@@ -2,5 +2,3 @@ python-telegram-bot==20.7
 cloudscraper==1.2.71
 requests==2.31.0
 pysocks==1.7.1
-supabase
-httpx<0.26
