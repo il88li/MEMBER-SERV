@@ -1,14 +1,5 @@
-{
-  "builds": [
-    {
-      "src": "api/**/*.py",
-      "use": "@vercel/python"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/api/webhook.py"
-    }
-  ]
-}
+python-telegram-bot==20.7
+cloudscraper==1.2.71
+requests==2.31.0
+pysocks==1.7.1
+Flask==2.3.3
