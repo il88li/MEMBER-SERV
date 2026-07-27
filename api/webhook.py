@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from telegram import Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
-# استيراد من مجلد bot
+# استيراد من مجلد bot (المسار الصحيح)
 from bot import config
 from bot import database as db
 from bot import grok_api
@@ -45,7 +45,7 @@ app.add_handler(MessageHandler(filters.PHOTO & ~filters.COMMAND, handle_image))
 app.add_handler(CallbackQueryHandler(other_callbacks, pattern="^(?!extract$|cancel_extract$|admin_).*$"))
 app.add_error_handler(error_handler)
 
-# تهيئة قاعدة البيانات
+# تهيئة قاعدة البيانات (إنشاء الجداول)
 db.init_db()
 
 # ============================================================
@@ -66,4 +66,5 @@ async def handler(request):
     else:
         return {"status": "ok", "message": "UFOQ Bot is running"}, 200
 
+# للتوافق مع Vercel
 webhook = handler
