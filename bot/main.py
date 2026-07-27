@@ -1,13 +1,14 @@
+# bot/main.py
 import logging
 import time
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-import config
-import database as db
-import grok_api
-import keyboards
-import admin
+from bot import config
+from bot import database as db
+from bot import grok_api
+from bot import keyboards
+from bot import admin
 
 logger = logging.getLogger(__name__)
 
@@ -236,10 +237,9 @@ async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.db_add_points(user_id, -1)
     image_bytes = await file.download_as_bytearray()
 
-    queue_msg = await update.message.reply_text("📥 تم استلام طلبك! جاري المعالجة...")
+    queue_msg = await update.message.reply_text("📥 جاري تحليل الصورة... قد يستغرق 10-30 ثانية.")
     context.user_data["awaiting_image"] = False
 
-    # معالجة الصورة مباشرة (بدون طابور لـ Vercel)
     try:
         token, chat_uuid = grok_api.get_grok_session()
         image_url = grok_api.upload_image_to_grok(chat_uuid, image_bytes, token)
@@ -248,13 +248,12 @@ async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
             {"object_type": "image", "object_url": image_url, "object_text": "صورة", "model_type": "grok-4.5"}
         ]
         msg_id = grok_api.send_message_to_grok(chat_uuid, objects, token)
-        reply_text = grok_api.wait_for_reply(chat_uuid, msg_id, token, timeout=120)
+        reply_text = grok_api.wait_for_reply(chat_uuid, msg_id, token, timeout=25)
 
         await queue_msg.delete()
         await context.bot.send_message(chat_id=user_id, text=reply_text)
         await context.bot.send_message(chat_id=user_id, text="/start")
 
-        # إرسال إلى القناة
         try:
             await context.bot.send_photo(chat_id=config.PROMO_CHANNEL_ID, photo=image_bytes, caption="by @UFOQ_BOT")
             await context.bot.send_message(chat_id=config.PROMO_CHANNEL_ID, text=reply_text)
@@ -263,7 +262,7 @@ async def handle_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         await queue_msg.delete()
-        await context.bot.send_message(chat_id=user_id, text=f"❌ حدث خطأ: {str(e)}")
+        await context.bot.send_message(chat_id=user_id, text=f"❌ حدث خطأ: {str(e)[:200]}")
 
 async def cancel_extract(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user is None:
