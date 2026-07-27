@@ -1,13 +1,12 @@
 # api/webhook.py
-# [+] نقطة دخول فيرسل - معاد هيكلته بالكامل للتوافق مع ASGI
+# [+] نقطة دخول Vercel باستخدام Flask (متوافق مع WSGI)
 
 import sys
 import os
 import json
 import logging
 import asyncio
-import requests
-from typing import Dict, Any
+from flask import Flask, request, jsonify
 
 # [+] إعداد مسار الاستيراد
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -32,196 +31,123 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# [+] متغيرات عامة للتحكم في تهيئة الويب هوك
-_webhook_set = False
-
 # ============================================================
-# [+] تهيئة التطبيق (يتم استدعاؤها مرة واحدة فقط)
+# [+] تهيئة تطبيق البوت (غير متزامن)
 # ============================================================
 
-def init_application() -> Application:
-    """[+] تهيئة تطبيق البوت مع جميع المعالجات"""
-    app = Application.builder().token(config.BOT_TOKEN).build()
-    
-    # [+] أوامر نصية
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("cancel", cancel_command))
-    app.add_handler(CommandHandler("admin", admin.admin_panel_command))
-    app.add_handler(CommandHandler("add_points", admin.add_points_command))
-    app.add_handler(CommandHandler("remove_points", admin.remove_points_command))
-    app.add_handler(CommandHandler("create_gift", admin.create_gift_command))
-    app.add_handler(CommandHandler("ban", admin.ban_command))
-    app.add_handler(CommandHandler("unban", admin.unban_command))
-    app.add_handler(CommandHandler("banned_list", admin.banned_list_command))
-    
-    # [+] معالج محادثة الأدمن
-    app.add_handler(admin.get_admin_conversation_handler())
-    
-    # [+] استعلامات رد الاتصال
-    app.add_handler(CallbackQueryHandler(extract_button, pattern="^extract$"))
-    app.add_handler(CallbackQueryHandler(cancel_extract, pattern="^cancel_extract$"))
-    app.add_handler(MessageHandler(filters.PHOTO & ~filters.COMMAND, handle_image))
-    app.add_handler(CallbackQueryHandler(other_callbacks, pattern="^(?!extract$|cancel_extract$|admin_).*$"))
-    
-    # [+] معالج الأخطاء العام
-    app.add_error_handler(error_handler)
-    
-    # [+] تهيئة قاعدة البيانات (مرة واحدة)
-    db.init_db()
-    
-    logger.info("[+] تم تهيئة تطبيق البوت بنجاح")
-    return app
+_app_instance = None
+
+def get_app() -> Application:
+    """[+] تهيئة كسولة لتطبيق البوت"""
+    global _app_instance
+    if _app_instance is None:
+        app = Application.builder().token(config.BOT_TOKEN).build()
+        
+        # [+] إضافة المعالجات
+        app.add_handler(CommandHandler("start", start))
+        app.add_handler(CommandHandler("cancel", cancel_command))
+        app.add_handler(CommandHandler("admin", admin.admin_panel_command))
+        app.add_handler(CommandHandler("add_points", admin.add_points_command))
+        app.add_handler(CommandHandler("remove_points", admin.remove_points_command))
+        app.add_handler(CommandHandler("create_gift", admin.create_gift_command))
+        app.add_handler(CommandHandler("ban", admin.ban_command))
+        app.add_handler(CommandHandler("unban", admin.unban_command))
+        app.add_handler(CommandHandler("banned_list", admin.banned_list_command))
+        app.add_handler(admin.get_admin_conversation_handler())
+        app.add_handler(CallbackQueryHandler(extract_button, pattern="^extract$"))
+        app.add_handler(CallbackQueryHandler(cancel_extract, pattern="^cancel_extract$"))
+        app.add_handler(MessageHandler(filters.PHOTO & ~filters.COMMAND, handle_image))
+        app.add_handler(CallbackQueryHandler(other_callbacks, pattern="^(?!extract$|cancel_extract$|admin_).*$"))
+        app.add_error_handler(error_handler)
+        
+        db.init_db()
+        logger.info("[+] تم تهيئة تطبيق البوت بنجاح")
+        _app_instance = app
+    return _app_instance
 
 # ============================================================
-# [+] تعيين الويب هوك بأمان مع منع التكرار
+# [+] تعيين Webhook باستخدام Flask (مرة واحدة)
 # ============================================================
 
-def set_webhook_safe() -> bool:
-    """[+] تعيين الويب هوك مع التحقق من عدم التكرار"""
-    global _webhook_set
-    
-    if _webhook_set:
-        logger.debug("[~] تم تعيين الويب هوك مسبقاً، تخطي")
-        return True
-    
+def set_webhook_if_needed():
+    """[+] تعيين webhook عند أول طلب فقط"""
+    import requests
     webhook_url = "https://member-serv.vercel.app/api/webhook"
     api_url = f"https://api.telegram.org/bot{config.BOT_TOKEN}/setWebhook"
     
     try:
-        # [+] التحقق من الويب هوك الحالي أولاً
+        # [+] التحقق من الوضع الحالي
         check_url = f"https://api.telegram.org/bot{config.BOT_TOKEN}/getWebhookInfo"
-        check_resp = requests.get(check_url, timeout=10)
+        check_resp = requests.get(check_url, timeout=5)
         if check_resp.status_code == 200:
             info = check_resp.json()
             if info.get("ok") and info.get("result", {}).get("url") == webhook_url:
-                logger.info("[=] الويب هوك مُعيّن بالفعل بشكل صحيح")
-                _webhook_set = True
-                return True
+                logger.info("[=] Webhook مُعيّن بالفعل")
+                return
         
-        # [+] تعيين الويب هوك
+        # [+] تعيين webhook
         resp = requests.post(api_url, json={"url": webhook_url}, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("ok"):
-                logger.info(f"[+] تم تعيين الويب هوك بنجاح إلى {webhook_url}")
-                _webhook_set = True
-                return True
-            else:
-                logger.error(f"[-] فشل تعيين الويب هوك: {data.get('description')}")
-                return False
+        if resp.status_code == 200 and resp.json().get("ok"):
+            logger.info(f"[+] تم تعيين Webhook إلى {webhook_url}")
         else:
-            logger.error(f"[-] HTTP {resp.status_code} من واجهة برمجة تطبيقات تيليجرام")
-            return False
+            logger.error(f"[-] فشل تعيين Webhook: {resp.text}")
     except Exception as e:
-        logger.error(f"[-] خطأ في تعيين الويب هوك: {e}")
-        return False
+        logger.error(f"[-] خطأ في تعيين Webhook: {e}")
 
 # ============================================================
-# [+] نقطة الدخول من فيرسل - متوافقة مع ASGI
+# [+] إنشاء تطبيق Flask
 # ============================================================
 
-# [+] يتم إنشاء التطبيق مرة واحدة عند تحميل الوحدة
-_app_instance = None
+flask_app = Flask(__name__)
 
-def get_app() -> Application:
-    """[+] الحصول على نسخة التطبيق (تهيئة كسولة)"""
-    global _app_instance
-    if _app_instance is None:
-        _app_instance = init_application()
-    return _app_instance
-
-async def app(scope: Dict[str, Any], receive: Any, send: Any) -> None:
-    """[+] نقطة دخول ASGI الرئيسية المتوافقة مع فيرسل"""
-    
-    # [+] معالجة طلبات HTTP
-    if scope["type"] == "http":
-        # [+] الحصول على الطلب
-        body = b""
-        more_body = True
-        while more_body:
-            message = await receive()
-            body += message.get("body", b"")
-            more_body = message.get("more_body", False)
+@flask_app.route("/api/webhook", methods=["POST"])
+def webhook_handler():
+    """[+] نقطة استقبال Webhook من Telegram"""
+    try:
+        # [+] تعيين Webhook (مرة واحدة)
+        set_webhook_if_needed()
         
-        # [+] تحليل المسار والطريقة
-        path = scope.get("path", "/")
-        method = scope.get("method", "GET")
+        # [+] الحصول على بيانات الطلب
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Invalid JSON"}), 400
         
-        # [+] معالجة طلب POST من تيليجرام
-        if method == "POST" and path == "/api/webhook":
-            try:
-                # [+] تعيين الويب هوك بأمان (مرة واحدة)
-                set_webhook_safe()
-                
-                # [+] الحصول على التطبيق المُهيأ
-                app_instance = get_app()
-                
-                # [+] تحليل نص الطلب
-                body_text = body.decode("utf-8")
-                update_data = json.loads(body_text)
-                logger.info(f"[+] تحديث وارد: {update_data.get('update_id', 'غير معروف')}")
-                
-                # [+] معالجة التحديث
-                update = Update.de_json(update_data, app_instance.bot)
-                await app_instance.process_update(update)
-                
-                # [+] إرسال استجابة نجاح
-                await send({
-                    "type": "http.response.start",
-                    "status": 200,
-                    "headers": [(b"content-type", b"application/json")],
-                })
-                await send({
-                    "type": "http.response.body",
-                    "body": b'{"ok": true}',
-                })
-                
-            except json.JSONDecodeError as e:
-                logger.error(f"[-] خطأ في تحليل JSON: {e}")
-                await send({
-                    "type": "http.response.start",
-                    "status": 400,
-                    "headers": [(b"content-type", b"application/json")],
-                })
-                await send({
-                    "type": "http.response.body",
-                    "body": b'{"error": "Invalid JSON"}',
-                })
-                
-            except Exception as e:
-                logger.error(f"[-] خطأ غير متوقع: {e}", exc_info=True)
-                await send({
-                    "type": "http.response.start",
-                    "status": 500,
-                    "headers": [(b"content-type", b"application/json")],
-                })
-                await send({
-                    "type": "http.response.body",
-                    "body": b'{"error": "Internal server error"}',
-                })
+        logger.info(f"[+] تحديث وارد: {data.get('update_id', 'unknown')}")
         
-        # [+] معالجة طلبات GET للتحقق من الصحة
-        else:
-            await send({
-                "type": "http.response.start",
-                "status": 200,
-                "headers": [(b"content-type", b"application/json")],
-            })
-            await send({
-                "type": "http.response.body",
-                "body": b'{"status": "ok", "message": "UFOQ Bot is running"}',
-            })
-    
-    # [+] تجاهل الأنواع الأخرى من النطاقات
-    else:
-        pass
+        # [+] تهيئة التطبيق
+        app = get_app()
+        
+        # [+] معالجة التحديث (غير متزامن، نستخدم asyncio.run)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            update = Update.de_json(data, app.bot)
+            loop.run_until_complete(app.process_update(update))
+        finally:
+            loop.close()
+        
+        return jsonify({"ok": True}), 200
+        
+    except Exception as e:
+        logger.error(f"[-] خطأ في معالجة الطلب: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+@flask_app.route("/api/webhook", methods=["GET"])
+def health_check():
+    """[+] نقطة للتحقق من صحة التطبيق"""
+    return jsonify({"status": "ok", "message": "UFOQ Bot is running"}), 200
+
+@flask_app.route("/", methods=["GET"])
+def root():
+    """[+] الصفحة الرئيسية"""
+    return jsonify({"status": "ok", "message": "UFOQ Bot is running"}), 200
 
 # ============================================================
-# [+] تصدير المتغير المطلوب من فيرسل
+# [+] تصدير التطبيق لـ Vercel
 # ============================================================
 
-# [+] هذا هو المتغير الذي يبحث عنه فيرسل
-# [+] فيرسل يتوقع 'app' كتطبيق ASGI
+# [+] Vercel يتوقع متغيراً باسم `app` لتطبيقات WSGI
+app = flask_app
 
-# [+] للتوافق مع الإصدارات القديمة، نحتفظ بـ 'webhook' أيضاً
-webhook = app
+# [+] للتوافق مع الإصدارات القديمة
+webhook = flask_app
