@@ -8,9 +8,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from telegram import Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
+# استيراد الملفات من مجلد bot
 from bot import config
 from bot import database as db
-from bot import grok_api
+import bot.grok_api as grok_api      # <-- التعديل الأساسي
 from bot import keyboards
 from bot import admin
 from bot.main import (
