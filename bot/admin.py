@@ -6,6 +6,7 @@ from bot import database as db
 
 logger = logging.getLogger(__name__)
 
+# ... باقي الكود كما هو ... (جميع الدوال الإدارية موجودة)
 ADMIN_MAIN, ADMIN_AWAITING_ADD_POINTS, ADMIN_AWAITING_REMOVE_POINTS, ADMIN_AWAITING_GIFT, ADMIN_AWAITING_BAN, ADMIN_AWAITING_UNBAN = range(6)
 
 def is_admin(user_id):
