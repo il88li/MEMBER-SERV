@@ -1,6 +1,6 @@
+
 python-telegram-bot==20.7
 cloudscraper==1.2.71
 requests==2.31.0
 pysocks==1.7.1
-supabase==2.0.4
-postgrest==0.15.0
+supabase==2.6.0
