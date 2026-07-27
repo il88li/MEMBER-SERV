@@ -15,7 +15,7 @@ _grok_chat_uuid = None
 _grok_email = None
 _grok_email_id = None
 _grok_session_expiry = 0
-GROK_SESSION_TIMEOUT = 3600  # ساعة واحدة
+GROK_SESSION_TIMEOUT = 3600
 
 ZECO_URL = "https://zecora0.serv00.net/Gmail.php"
 
