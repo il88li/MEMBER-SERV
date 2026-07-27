@@ -45,7 +45,7 @@ app.add_handler(MessageHandler(filters.PHOTO & ~filters.COMMAND, handle_image))
 app.add_handler(CallbackQueryHandler(other_callbacks, pattern="^(?!extract$|cancel_extract$|admin_).*$"))
 app.add_error_handler(error_handler)
 
-# تهيئة قاعدة البيانات (إنشاء الجداول)
+# تهيئة قاعدة البيانات
 db.init_db()
 
 # ============================================================
@@ -66,5 +66,4 @@ async def handler(request):
     else:
         return {"status": "ok", "message": "UFOQ Bot is running"}, 200
 
-# للتوافق مع Vercel
 webhook = handler
