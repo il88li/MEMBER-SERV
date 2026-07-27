@@ -1,31 +1,11 @@
 from supabase import create_client, Client
 import config
 
+# استخدام القيم المضمنة مباشرة من config
 supabase: Client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
 
 def init_db():
-    """إنشاء الجداول في Supabase (يتم يدوياً مرة واحدة)."""
-    # يجب إنشاء الجداول يدوياً في Supabase SQL Editor:
-    # 
-    # CREATE TABLE users (
-    #     user_id BIGINT PRIMARY KEY,
-    #     points INTEGER DEFAULT 1,
-    #     invited_by BIGINT DEFAULT NULL,
-    #     invite_count INTEGER DEFAULT 0
-    # );
-    # 
-    # CREATE TABLE banned_users (
-    #     user_id BIGINT PRIMARY KEY,
-    #     banned_at TIMESTAMP DEFAULT NOW()
-    # );
-    # 
-    # CREATE TABLE gift_links (
-    #     code TEXT PRIMARY KEY,
-    #     points INTEGER NOT NULL,
-    #     max_uses INTEGER NOT NULL,
-    #     used_count INTEGER DEFAULT 0,
-    #     created_at TIMESTAMP DEFAULT NOW()
-    # );
+    """تهيئة قاعدة البيانات (يتم إنشاء الجداول يدوياً في Supabase)."""
     pass
 
 def db_get_user(user_id):
