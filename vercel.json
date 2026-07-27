@@ -14,15 +14,5 @@
             "src": "/(.*)",
             "dest": "api/webhook.py"
         }
-    ],
-    "env": {
-        "BOT_TOKEN": "8998562807:AAG4GIpWf7qWLPuTpD0f-nGXYZEDOgZXIto",
-        "BOT_USERNAME": "UFOQ_BOT",
-        "CHANNEL_ID": "@UFOQ_7",
-        "ADMIN_ID": "6689435577",
-        "PROMO_CHANNEL_ID": "@ufoq_pre",
-        "SUPABASE_URL": "your_supabase_url",
-        "SUPABASE_KEY": "your_supabase_key",
-        "PROXY_ENABLED": "false"
-    }
+    ]
 }
