@@ -1,8 +1,7 @@
 {
   "functions": {
     "api/webhook.py": {
-      "runtime": "python@3.11",
-      "maxDuration": 30
+      "runtime": "python3.11"
     }
   }
 }
