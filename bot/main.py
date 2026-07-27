@@ -12,7 +12,6 @@ from bot import admin
 
 logger = logging.getLogger(__name__)
 
-# ========== Rate Limiting ==========
 _rate_limit_cache = {}
 RATE_LIMIT_WINDOW = 10
 RATE_LIMIT_MAX = 5
@@ -27,7 +26,6 @@ def check_rate_limit(user_id: int) -> bool:
     _rate_limit_cache[user_id].append(now)
     return True
 
-# ========== Subscription Cache ==========
 _subscription_cache = {}
 CACHE_TTL = 30
 
@@ -45,7 +43,6 @@ async def check_subscription(chat_id, context):
     _subscription_cache[chat_id] = {"status": status, "timestamp": now}
     return status
 
-# ========== Safe Edit Caption ==========
 async def safe_edit_caption(query, caption, reply_markup=None):
     try:
         if query.message.caption is None:
@@ -82,7 +79,6 @@ async def safe_edit_caption(query, caption, reply_markup=None):
         else:
             raise
 
-# ========== معالجات المستخدم ==========
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user is None:
         return
