@@ -10,7 +10,7 @@ from typing import Optional
 # ============================================================
 
 # [+] إعدادات البوت الأساسية
-BOT_TOKEN = "8998562807:AAG4GIpWf7qWLPuTpD0f-nGXYZEDOgZXIto"
+BOT_TOKEN = "8998562807:AAG2o-n-qcOvG5zjk_TAzNB8PZ0AM2Pyl3U"
 BOT_USERNAME = "UFOQ_BOT"
 CHANNEL_ID = "@UFOQ_7"
 ADMIN_ID = 6689435577
