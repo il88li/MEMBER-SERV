@@ -1,5 +1,5 @@
 # api/webhook.py
-# [+] نقطة دخول Vercel مع Webhook تلقائي بالكامل
+# [+] نقطة دخول Vercel مع تسجيل مفصل وتعيين Webhook يدوي
 
 import sys
 import os
@@ -20,21 +20,19 @@ from bot.main import (
     cancel_command, other_callbacks, error_handler
 )
 
-logging.basicConfig(level=logging.INFO)
+# [+] تهيئة التسجيل مع مستوى DEBUG لمشاهدة كل التفاصيل
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# [+] متغيرات التحكم في Webhook
+# [+] متغيرات التحكم
 # ============================================================
 
-_webhook_status = {
-    "is_set": False,
-    "last_check": 0,
-    "url": ""
-}
-
-WEBHOOK_CHECK_INTERVAL = 300  # 5 دقائق بين كل فحص
 WEBHOOK_URL = "https://ufoqai.vercel.app/api/webhook"
+_webhook_set = False
 
 # ============================================================
 # [+] تهيئة البوت
@@ -43,12 +41,10 @@ WEBHOOK_URL = "https://ufoqai.vercel.app/api/webhook"
 _app_bot = None
 
 def get_bot_app():
-    """[+] تهيئة تطبيق البوت (مرة واحدة)"""
     global _app_bot
     if _app_bot is None:
+        logger.info("[+] بدء تهيئة تطبيق البوت...")
         _app_bot = Application.builder().token(config.BOT_TOKEN).build()
-        
-        # [+] إضافة المعالجات
         _app_bot.add_handler(CommandHandler("start", start))
         _app_bot.add_handler(CommandHandler("cancel", cancel_command))
         _app_bot.add_handler(CommandHandler("admin", admin.admin_panel_command))
@@ -64,71 +60,47 @@ def get_bot_app():
         _app_bot.add_handler(MessageHandler(filters.PHOTO & ~filters.COMMAND, handle_image))
         _app_bot.add_handler(CallbackQueryHandler(other_callbacks, pattern="^(?!extract$|cancel_extract$|admin_).*$"))
         _app_bot.add_error_handler(error_handler)
-        
         db.init_db()
         logger.info("[+] تم تهيئة تطبيق البوت بنجاح")
     return _app_bot
 
 # ============================================================
-# [+] دوال إدارة Webhook التلقائية
+# [+] دالة تعيين Webhook مع تسجيل مفصل
 # ============================================================
 
-def ensure_webhook():
-    """[+] يتحقق من Webhook ويعيد تعيينه إذا لزم الأمر"""
-    global _webhook_status
-    
-    now = time.time()
-    
-    # [+] إذا مر وقت كافٍ منذ آخر فحص
-    if now - _webhook_status["last_check"] < WEBHOOK_CHECK_INTERVAL and _webhook_status["is_set"]:
-        return True
-    
-    logger.info("[~] جاري التحقق من حالة Webhook...")
+def set_webhook_manually():
+    """[+] تعيين Webhook مع تسجيل كل خطوة"""
+    global _webhook_set
+    logger.info("[~] بدء تعيين Webhook...")
     
     try:
-        # [+] 1. الحصول على حالة Webhook الحالية
-        info_url = f"https://api.telegram.org/bot{config.BOT_TOKEN}/getWebhookInfo"
-        resp = requests.get(info_url, timeout=10)
-        
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get("ok"):
-                current_url = data.get("result", {}).get("url")
-                
-                # [+] إذا كان Webhook صحيحاً بالفعل
-                if current_url == WEBHOOK_URL:
-                    _webhook_status["is_set"] = True
-                    _webhook_status["last_check"] = now
-                    _webhook_status["url"] = current_url
-                    logger.info("[=] Webhook مُعيّن بالفعل بشكل صحيح")
-                    return True
-                
-                # [+] إذا كان Webhook مختلفاً أو غير موجود
-                logger.info(f"[~] Webhook الحالي: {current_url} - جاري التصحيح...")
-        
-        # [+] 2. حذف Webhook القديم (إن وجد)
+        # [+] 1. حذف Webhook القديم
+        logger.info("[~] حذف Webhook القديم...")
         delete_url = f"https://api.telegram.org/bot{config.BOT_TOKEN}/deleteWebhook"
-        requests.post(delete_url, timeout=5)
+        del_resp = requests.post(delete_url, timeout=10)
+        logger.info(f"[=] رد الحذف: {del_resp.status_code} - {del_resp.text[:200]}")
         
-        # [+] 3. تعيين Webhook الجديد
+        # [+] 2. تعيين Webhook الجديد
+        logger.info(f"[~] تعيين Webhook إلى {WEBHOOK_URL}...")
         set_url = f"https://api.telegram.org/bot{config.BOT_TOKEN}/setWebhook"
-        resp = requests.post(set_url, json={"url": WEBHOOK_URL}, timeout=10)
+        set_resp = requests.post(set_url, json={"url": WEBHOOK_URL}, timeout=10)
+        logger.info(f"[=] رد التعيين: {set_resp.status_code} - {set_resp.text[:200]}")
         
-        if resp.status_code == 200 and resp.json().get("ok"):
-            _webhook_status["is_set"] = True
-            _webhook_status["last_check"] = now
-            _webhook_status["url"] = WEBHOOK_URL
-            logger.info(f"[+] تم تعيين Webhook تلقائياً إلى {WEBHOOK_URL}")
-            return True
+        if set_resp.status_code == 200:
+            data = set_resp.json()
+            if data.get("ok"):
+                _webhook_set = True
+                logger.info("[+] تم تعيين Webhook بنجاح!")
+                return True
+            else:
+                logger.error(f"[-] فشل تعيين Webhook: {data}")
+                return False
         else:
-            logger.error(f"[-] فشل تعيين Webhook: {resp.text}")
-            _webhook_status["is_set"] = False
-            _webhook_status["last_check"] = now
+            logger.error(f"[-] فشل تعيين Webhook: HTTP {set_resp.status_code}")
             return False
             
     except Exception as e:
-        logger.error(f"[-] خطأ في التحقق من Webhook: {e}")
-        _webhook_status["last_check"] = now
+        logger.error(f"[-] استثناء في تعيين Webhook: {e}", exc_info=True)
         return False
 
 # ============================================================
@@ -139,30 +111,56 @@ flask_app = Flask(__name__)
 
 @flask_app.route("/", methods=["GET"])
 def home():
-    """[+] الصفحة الرئيسية"""
+    """[+] الصفحة الرئيسية - تعيين Webhook تلقائياً عند الزيارة"""
+    logger.info("[~] طلب GET إلى /")
+    result = set_webhook_manually()
     return jsonify({
         "status": "ok",
         "message": "UFOQ Bot is running",
-        "webhook_status": "automatic",
-        "webhook_url": WEBHOOK_URL,
-        "is_set": _webhook_status["is_set"]
+        "webhook_set": result,
+        "webhook_url": WEBHOOK_URL
     }), 200
+
+@flask_app.route("/api/set_webhook", methods=["GET"])
+def set_webhook_endpoint():
+    """[+] نقطة مخصصة لتعيين Webhook يدوياً"""
+    logger.info("[~] طلب GET إلى /api/set_webhook")
+    result = set_webhook_manually()
+    return jsonify({
+        "status": "success" if result else "failed",
+        "webhook_set": result,
+        "webhook_url": WEBHOOK_URL,
+        "message": "Webhook set successfully" if result else "Webhook setting failed"
+    }), 200 if result else 500
+
+@flask_app.route("/api/webhook_info", methods=["GET"])
+def webhook_info():
+    """[+] عرض معلومات Webhook الحالية"""
+    logger.info("[~] طلب GET إلى /api/webhook_info")
+    try:
+        info_url = f"https://api.telegram.org/bot{config.BOT_TOKEN}/getWebhookInfo"
+        resp = requests.get(info_url, timeout=10)
+        return jsonify(resp.json()), 200
+    except Exception as e:
+        logger.error(f"[-] خطأ في جلب معلومات Webhook: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @flask_app.route("/api/webhook", methods=["POST"])
 def webhook_handler():
-    """[+] نقطة استقبال Webhook من Telegram"""
+    """[+] استقبال تحديثات Telegram"""
+    logger.info("[~] طلب POST إلى /api/webhook")
     try:
-        # [+] تأكد من تعيين Webhook (تلقائياً)
-        ensure_webhook()
+        # [+] التأكد من تعيين Webhook (محاولة مرة أخرى)
+        if not _webhook_set:
+            set_webhook_manually()
         
-        # [+] استلام البيانات
         data = request.get_json()
         if not data:
+            logger.warning("[-] بيانات JSON غير صالحة")
             return jsonify({"error": "Invalid JSON"}), 400
         
         logger.info(f"[+] تحديث وارد: {data.get('update_id', 'unknown')}")
         
-        # [+] معالجة التحديث
         bot = get_bot_app()
         update = Update.de_json(data, bot.bot)
         
@@ -179,105 +177,9 @@ def webhook_handler():
         logger.error(f"[-] خطأ في معالجة الطلب: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
-@flask_app.route("/api/webhook", methods=["GET"])
-def webhook_get():
-    """[+] نقطة GET للتحقق من الصحة"""
-    return jsonify({
-        "status": "ok",
-        "message": "Webhook endpoint is active",
-        "webhook_url": WEBHOOK_URL,
-        "is_set": _webhook_status["is_set"]
-    }), 200
-
 # ============================================================
-# [+] نقاط نهاية للتحكم اليدوي (احتياطي)
-# ============================================================
-
-@flask_app.route("/api/set_webhook", methods=["GET"])
-def set_webhook_manual():
-    """[+] تعيين Webhook يدوياً (احتياطي)"""
-    try:
-        # [+] حذف القديم
-        requests.post(f"https://api.telegram.org/bot{config.BOT_TOKEN}/deleteWebhook", timeout=5)
-        
-        # [+] تعيين الجديد
-        resp = requests.post(
-            f"https://api.telegram.org/bot{config.BOT_TOKEN}/setWebhook",
-            json={"url": WEBHOOK_URL},
-            timeout=10
-        )
-        
-        if resp.status_code == 200 and resp.json().get("ok"):
-            _webhook_status["is_set"] = True
-            _webhook_status["last_check"] = time.time()
-            _webhook_status["url"] = WEBHOOK_URL
-            return jsonify({
-                "status": "success",
-                "message": f"Webhook set to {WEBHOOK_URL}",
-                "response": resp.json()
-            }), 200
-        else:
-            return jsonify({
-                "status": "error",
-                "message": "Failed to set webhook",
-                "response": resp.text
-            }), 500
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@flask_app.route("/api/webhook_info", methods=["GET"])
-def webhook_info():
-    """[+] عرض معلومات Webhook الحالية"""
-    try:
-        resp = requests.get(
-            f"https://api.telegram.org/bot{config.BOT_TOKEN}/getWebhookInfo",
-            timeout=10
-        )
-        if resp.status_code == 200:
-            return jsonify(resp.json()), 200
-        else:
-            return jsonify({"error": resp.text}), 500
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@flask_app.route("/api/delete_webhook", methods=["GET"])
-def delete_webhook():
-    """[+] حذف Webhook الحالي"""
-    try:
-        resp = requests.post(
-            f"https://api.telegram.org/bot{config.BOT_TOKEN}/deleteWebhook",
-            timeout=10
-        )
-        if resp.status_code == 200 and resp.json().get("ok"):
-            _webhook_status["is_set"] = False
-            return jsonify({"status": "success", "message": "Webhook deleted"}), 200
-        else:
-            return jsonify({"error": resp.text}), 500
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# ============================================================
-# [+] تهيئة Webhook عند بدء التطبيق
-# ============================================================
-
-# [+] محاولة تعيين Webhook عند تحميل الوحدة (مرة واحدة)
-try:
-    ensure_webhook()
-except Exception as e:
-    logger.error(f"[-] فشل تعيين Webhook عند البدء: {e}")
-
-# ============================================================
-# [+] تصدير التطبيق لـ Vercel
+# [+] تصدير التطبيق
 # ============================================================
 
 app = flask_app
-@flask_app.route("/api/health", methods=["GET"])
-def health_check():
-    """[+] نقطة للتحقق من صحة التطبيق وتعيين Webhook"""
-    result = ensure_webhook()
-    return jsonify({
-        "status": "ok",
-        "webhook_set": result,
-        "webhook_url": WEBHOOK_URL,
-        "message": "Webhook ensured" if result else "Webhook not set"
-    }), 200
+logger.info("[+] تم تحميل تطبيق Flask بنجاح")
