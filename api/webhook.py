@@ -271,3 +271,13 @@ except Exception as e:
 # ============================================================
 
 app = flask_app
+@flask_app.route("/api/health", methods=["GET"])
+def health_check():
+    """[+] نقطة للتحقق من صحة التطبيق وتعيين Webhook"""
+    result = ensure_webhook()
+    return jsonify({
+        "status": "ok",
+        "webhook_set": result,
+        "webhook_url": WEBHOOK_URL,
+        "message": "Webhook ensured" if result else "Webhook not set"
+    }), 200
